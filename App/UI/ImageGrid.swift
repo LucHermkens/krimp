@@ -2,6 +2,9 @@ import SwiftUI
 
 struct ImageGrid: View {
     @Environment(AppModel.self) private var model
+    @FocusState private var focused: Bool
+    /// Anchor for shift-click range selection.
+    @State private var anchor: ImageItem.ID?
 
     private let columns = [GridItem(.adaptive(minimum: 150, maximum: 220), spacing: 16)]
 
@@ -9,12 +12,47 @@ struct ImageGrid: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 18) {
                 ForEach(model.items) { item in
-                    ImageCard(item: item)
-                        .contextMenu { ItemMenu(ids: [item.id]) }
+                    ImageCard(item: item, isSelected: model.selection.contains(item.id))
+                        .contentShape(Rectangle())
+                        .onTapGesture { select(item.id) }
+                        .contextMenu { ItemMenu(ids: menuTargets(for: item.id)) }
                 }
             }
             .padding(16)
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            model.selection.removeAll()
+            focused = true
+        }
+        .focusable()
+        .focusEffectDisabled()
+        .focused($focused)
+        .onDeleteCommand { model.removeSelection() }
+    }
+
+    /// Click selects one item, ⌘-click toggles, ⇧-click extends from the last clicked item.
+    private func select(_ id: ImageItem.ID) {
+        focused = true
+        let flags = NSEvent.modifierFlags
+        if flags.contains(.command) {
+            if model.selection.remove(id) == nil { model.selection.insert(id) }
+            anchor = id
+        } else if flags.contains(.shift), let anchor, let from = index(of: anchor), let to = index(of: id) {
+            model.selection.formUnion(model.items[min(from, to)...max(from, to)].map(\.id))
+        } else {
+            model.selection = [id]
+            anchor = id
+        }
+    }
+
+    private func index(of id: ImageItem.ID) -> Int? {
+        model.items.firstIndex { $0.id == id }
+    }
+
+    /// Right-clicking a selected item acts on the whole selection, like Finder.
+    private func menuTargets(for id: ImageItem.ID) -> Set<ImageItem.ID> {
+        model.selection.contains(id) ? model.selection : [id]
     }
 }
 
@@ -33,6 +71,8 @@ struct ItemMenu: View {
 private struct ImageCard: View {
     @Environment(AppModel.self) private var model
     let item: ImageItem
+    let isSelected: Bool
+    @State private var isHovered = false
 
     var body: some View {
         VStack(spacing: 6) {
@@ -55,7 +95,26 @@ private struct ImageCard: View {
                 }
             }
             .frame(height: 140)
-            .overlay(alignment: .topTrailing) { StatusBadge(item: item).padding(6) }
+            .overlay {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(Color.accentColor, lineWidth: 3)
+                }
+            }
+            .overlay(alignment: .bottomTrailing) { StatusBadge(item: item).padding(6) }
+            .overlay(alignment: .topTrailing) {
+                if isHovered && item.state != .processing && !model.isRunning {
+                    Button("Remove from List", systemImage: "trash") { model.remove([item.id]) }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderless)
+                        .font(.caption)
+                        .padding(5)
+                        .background(Color(nsColor: .windowBackgroundColor).opacity(0.9), in: Circle())
+                        .padding(6)
+                        .help("Remove from list")
+                }
+            }
+            .onHover { isHovered = $0 }
             .overlay(alignment: .topLeading) {
                 if item.source?.isAnimated == true {
                     Badge(text: "Animated → first frame", systemImage: "film")

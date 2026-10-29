@@ -11,6 +11,8 @@ final class AppModel {
     private(set) var items: [ImageItem] = []
     private(set) var isRunning = false
     var showImporter = false
+    /// Shared by the grid and the table.
+    var selection = Set<ImageItem.ID>()
 
     @ObservationIgnored private var runTask: Task<Void, Never>?
 
@@ -33,11 +35,17 @@ final class AppModel {
 
     func remove(_ ids: Set<ImageItem.ID>) {
         items.removeAll { ids.contains($0.id) && $0.state != .processing }
+        selection.formIntersection(items.map(\.id))
+    }
+
+    func removeSelection() {
+        remove(selection)
     }
 
     func clear() {
         guard !isRunning else { return }
         items.removeAll()
+        selection.removeAll()
     }
 
     func item(_ id: ImageItem.ID) -> ImageItem? {

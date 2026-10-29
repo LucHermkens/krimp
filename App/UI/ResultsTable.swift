@@ -2,13 +2,13 @@ import SwiftUI
 
 struct ResultsTable: View {
     @Environment(AppModel.self) private var model
-    @State private var selection = Set<ImageItem.ID>()
     @State private var sortOrder = [KeyPathComparator(\ResultRow.name, comparator: .localizedStandard)]
 
     var body: some View {
+        @Bindable var model = model
         let rows = model.rows().sorted(using: sortOrder)
         VStack(spacing: 0) {
-            Table(rows, selection: $selection, sortOrder: $sortOrder) {
+            Table(rows, selection: $model.selection, sortOrder: $sortOrder) {
                 TableColumn("Name", value: \.name, comparator: .localizedStandard) { row in
                     Text(row.name).lineLimit(1).truncationMode(.middle).help(row.name)
                 }
@@ -41,6 +41,7 @@ struct ResultsTable: View {
                 .width(min: 60, ideal: 100)
             }
             .monospacedDigit()
+            .onDeleteCommand { model.removeSelection() }
             .contextMenu(forSelectionType: ImageItem.ID.self) { ids in
                 if !ids.isEmpty {
                     ItemMenu(ids: ids)
