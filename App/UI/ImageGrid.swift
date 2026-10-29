@@ -3,32 +3,64 @@ import SwiftUI
 struct ImageGrid: View {
     @Environment(AppModel.self) private var model
     @FocusState private var focused: Bool
-    /// Anchor for shift-click range selection.
+    /// Where a ⇧-click or ⇧-arrow range starts.
     @State private var anchor: ImageItem.ID?
+    /// The item the arrow keys move from.
+    @State private var cursor: ImageItem.ID?
+    @State private var width: CGFloat = 0
 
-    private let columns = [GridItem(.adaptive(minimum: 150, maximum: 220), spacing: 16)]
+    private static let minColumnWidth: CGFloat = 150
+    private static let spacing: CGFloat = 16
+    private static let padding: CGFloat = 16
+    private let columns = [GridItem(.adaptive(minimum: minColumnWidth, maximum: 220), spacing: spacing)]
+
+    /// Columns the adaptive grid lays out at the current width.
+    private var columnCount: Int {
+        max(1, Int((width - 2 * Self.padding + Self.spacing) / (Self.minColumnWidth + Self.spacing)))
+    }
 
     var body: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 18) {
-                ForEach(model.items) { item in
-                    ImageCard(item: item, isSelected: model.selection.contains(item.id))
-                        .contentShape(Rectangle())
-                        .onTapGesture { select(item.id) }
-                        .contextMenu { ItemMenu(ids: menuTargets(for: item.id)) }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 18) {
+                    ForEach(model.items) { item in
+                        ImageCard(item: item, isSelected: model.selection.contains(item.id))
+                            .contentShape(Rectangle())
+                            .onTapGesture { select(item.id) }
+                            .contextMenu { ItemMenu(ids: menuTargets(for: item.id)) }
+                            .id(item.id)
+                    }
                 }
+                .padding(Self.padding)
             }
-            .padding(16)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                model.selection.removeAll()
+                focused = true
+            }
+            .focusable()
+            .focusEffectDisabled()
+            .focused($focused)
+            .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { press in
+                let step = switch press.key {
+                case .leftArrow: -1
+                case .rightArrow: 1
+                case .upArrow: -columnCount
+                default: columnCount
+                }
+                guard let id = move(by: step, extend: press.modifiers.contains(.shift)) else { return .ignored }
+                proxy.scrollTo(id)
+                return .handled
+            }
+            .onKeyPress(keys: [.delete, .deleteForward]) { _ in
+                guard !model.selection.isEmpty, !model.isRunning else { return .ignored }
+                model.removeSelection()
+                return .handled
+            }
+            .onDeleteCommand { model.removeSelection() }
+            .onAppear { focused = true }
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            model.selection.removeAll()
-            focused = true
-        }
-        .focusable()
-        .focusEffectDisabled()
-        .focused($focused)
-        .onDeleteCommand { model.removeSelection() }
     }
 
     /// Click selects one item, ⌘-click toggles, ⇧-click extends from the last clicked item.
@@ -44,6 +76,31 @@ struct ImageGrid: View {
             model.selection = [id]
             anchor = id
         }
+        cursor = id
+    }
+
+    /// Moves the cursor `step` items (clamped to the list) and selects it; with `extend` the
+    /// selection becomes the range from the anchor. Returns the new cursor.
+    private func move(by step: Int, extend: Bool) -> ImageItem.ID? {
+        guard !model.items.isEmpty else { return nil }
+        let current = cursor.flatMap(index(of:))
+            ?? model.items.indices.last { model.selection.contains(model.items[$0].id) }
+        let target: Int
+        if let current {
+            target = min(max(current + step, 0), model.items.count - 1)
+        } else {
+            target = step < 0 ? model.items.count - 1 : 0
+        }
+        let id = model.items[target].id
+        if extend, let anchorIndex = (anchor ?? cursor).flatMap(index(of:)) ?? current {
+            model.selection = Set(model.items[min(anchorIndex, target)...max(anchorIndex, target)].map(\.id))
+            if anchor == nil { anchor = model.items[anchorIndex].id }
+        } else {
+            model.selection = [id]
+            anchor = id
+        }
+        cursor = id
+        return id
     }
 
     private func index(of id: ImageItem.ID) -> Int? {
