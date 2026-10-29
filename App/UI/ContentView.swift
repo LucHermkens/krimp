@@ -1,4 +1,3 @@
-import QuickLook
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -58,7 +57,6 @@ struct ContentView: View {
                       allowsMultipleSelection: true) { result in
             if case .success(let urls) = result { model.add(urls) }
         }
-        .quickLookPreview(Bindable(model).previewURL)
         .navigationTitle("Krimp")
     }
 }

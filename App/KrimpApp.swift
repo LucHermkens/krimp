@@ -1,3 +1,4 @@
+import QuickLookUI
 import SwiftUI
 
 @main
@@ -33,6 +34,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Dock drops and Finder's "Open With".
     func application(_ application: NSApplication, open urls: [URL]) {
         model.add(urls)
+    }
+
+    // Quick Look panel control: the app delegate sits at the end of the responder chain.
+    override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool { true }
+
+    override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        model.quickLook.take(panel)
+    }
+
+    override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        model.quickLook.release(panel)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }

@@ -3,8 +3,6 @@ import SwiftUI
 struct ImageGrid: View {
     @Environment(AppModel.self) private var model
     @FocusState private var focused: Bool
-    /// Where a ⇧-click or ⇧-arrow range starts.
-    @State private var anchor: ImageItem.ID?
     @State private var width: CGFloat = 0
 
     private static let minColumnWidth: CGFloat = 150
@@ -24,7 +22,10 @@ struct ImageGrid: View {
                     ForEach(model.items) { item in
                         ImageCard(item: item, isSelected: model.selection.contains(item.id))
                             .contentShape(Rectangle())
-                            .onTapGesture { select(item.id) }
+                            .onTapGesture {
+                                focused = true
+                                model.click(item.id, modifiers: NSEvent.modifierFlags)
+                            }
                             .contextMenu { ItemMenu(ids: menuTargets(for: item.id)) }
                             .id(item.id)
                     }
@@ -32,6 +33,10 @@ struct ImageGrid: View {
                 .padding(Self.padding)
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .onChange(of: columnCount, initial: true) { _, count in model.gridColumns = count }
+            .onChange(of: model.focusedItem) { _, id in
+                if let id { proxy.scrollTo(id) }
+            }
             .contentShape(Rectangle())
             .onTapGesture {
                 model.selection.removeAll()
@@ -41,15 +46,13 @@ struct ImageGrid: View {
             .focusEffectDisabled()
             .focused($focused)
             .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { press in
-                let step = switch press.key {
-                case .leftArrow: -1
-                case .rightArrow: 1
-                case .upArrow: -columnCount
-                default: columnCount
+                let direction: AppModel.MoveDirection = switch press.key {
+                case .leftArrow: .left
+                case .rightArrow: .right
+                case .upArrow: .up
+                default: .down
                 }
-                guard let id = move(by: step, extend: press.modifiers.contains(.shift)) else { return .ignored }
-                proxy.scrollTo(id)
-                return .handled
+                return model.moveFocus(direction, extend: press.modifiers.contains(.shift)) == nil ? .ignored : .handled
             }
             .onKeyPress(.space) {
                 model.togglePreview()
@@ -63,50 +66,6 @@ struct ImageGrid: View {
             .onDeleteCommand { model.removeSelection() }
             .onAppear { focused = true }
         }
-    }
-
-    /// Click selects one item, ⌘-click toggles, ⇧-click extends from the last clicked item.
-    private func select(_ id: ImageItem.ID) {
-        focused = true
-        let flags = NSEvent.modifierFlags
-        if flags.contains(.command) {
-            if model.selection.remove(id) == nil { model.selection.insert(id) }
-            anchor = id
-        } else if flags.contains(.shift), let anchor, let from = index(of: anchor), let to = index(of: id) {
-            model.selection.formUnion(model.items[min(from, to)...max(from, to)].map(\.id))
-        } else {
-            model.selection = [id]
-            anchor = id
-        }
-        model.focusedItem = id
-    }
-
-    /// Moves the selection `step` items (clamped to the list) and selects it; with `extend` the
-    /// selection becomes the range from the anchor. Returns the newly focused item.
-    private func move(by step: Int, extend: Bool) -> ImageItem.ID? {
-        guard !model.items.isEmpty else { return nil }
-        let current = model.focusedItem.flatMap(index(of:))
-            ?? model.items.indices.last { model.selection.contains(model.items[$0].id) }
-        let target: Int
-        if let current {
-            target = min(max(current + step, 0), model.items.count - 1)
-        } else {
-            target = step < 0 ? model.items.count - 1 : 0
-        }
-        let id = model.items[target].id
-        if extend, let anchorIndex = (anchor ?? model.focusedItem).flatMap(index(of:)) ?? current {
-            model.selection = Set(model.items[min(anchorIndex, target)...max(anchorIndex, target)].map(\.id))
-            if anchor == nil { anchor = model.items[anchorIndex].id }
-        } else {
-            model.selection = [id]
-            anchor = id
-        }
-        model.focusedItem = id
-        return id
-    }
-
-    private func index(of id: ImageItem.ID) -> Int? {
-        model.items.firstIndex { $0.id == id }
     }
 
     /// Right-clicking a selected item acts on the whole selection, like Finder.

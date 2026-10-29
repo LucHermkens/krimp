@@ -14,9 +14,19 @@ final class AppModel {
     /// Shared by the grid and the table.
     var selection = Set<ImageItem.ID>()
     /// The item last clicked or moved to with the arrow keys; Quick Look shows this one.
-    var focusedItem: ImageItem.ID?
-    /// File shown in the Quick Look panel, if open.
-    var previewURL: URL?
+    var focusedItem: ImageItem.ID? {
+        didSet { if focusedItem != oldValue { quickLook.reload() } }
+    }
+    /// Where a ⇧-click or ⇧-arrow range starts.
+    var selectionAnchor: ImageItem.ID?
+    /// Columns in the grid at its current width (set by the grid), for ↑/↓.
+    var gridColumns = 1
+
+    @ObservationIgnored let quickLook = QuickLookController()
+
+    init() {
+        quickLook.model = self
+    }
 
     @ObservationIgnored private var runTask: Task<Void, Never>?
 
@@ -46,14 +56,74 @@ final class AppModel {
         remove(selection)
     }
 
-    /// Space bar: Quick Look the focused item (the output if one was written), or close it.
+    // MARK: - Keyboard navigation and Quick Look
+
+    enum MoveDirection { case left, right, up, down }
+
+    /// Space bar: Quick Look the focused item, or close the panel.
     func togglePreview() {
-        if previewURL != nil {
-            previewURL = nil
-            return
+        if focusedItem.map({ !selection.contains($0) }) ?? true {
+            focusedItem = items.last { selection.contains($0.id) }?.id
         }
-        let id = focusedItem.flatMap { selection.contains($0) ? $0 : nil } ?? items.last { selection.contains($0.id) }?.id
-        previewURL = id.flatMap(item)?.revealURL
+        quickLook.toggle()
+    }
+
+    /// The file Quick Look shows: the written output once there is one.
+    var focusedURL: URL? {
+        focusedItem.flatMap(item)?.revealURL
+    }
+
+    /// Arrow keys: in the grid ←/→ move one item and ↑/↓ one row; in the table ↑/↓ move one row.
+    @discardableResult
+    func moveFocus(_ direction: MoveDirection, extend: Bool) -> ImageItem.ID? {
+        let step: Int
+        switch (settings.viewMode, direction) {
+        case (.grid, .left): step = -1
+        case (.grid, .right): step = 1
+        case (.grid, .up): step = -gridColumns
+        case (.grid, .down): step = gridColumns
+        case (.table, .up): step = -1
+        case (.table, .down): step = 1
+        case (.table, _): return nil
+        }
+        return moveFocus(by: step, extend: extend)
+    }
+
+    /// Moves the focus `step` items (clamped to the list) and selects it; with `extend` the
+    /// selection becomes the range from the anchor. Returns the newly focused item.
+    @discardableResult
+    func moveFocus(by step: Int, extend: Bool) -> ImageItem.ID? {
+        guard !items.isEmpty else { return nil }
+        let current = focusedItem.flatMap(index(of:)) ?? items.indices.last { selection.contains(items[$0].id) }
+        let target = current.map { min(max($0 + step, 0), items.count - 1) } ?? (step < 0 ? items.count - 1 : 0)
+        let id = items[target].id
+        if extend, let anchorIndex = (selectionAnchor ?? focusedItem).flatMap(index(of:)) ?? current {
+            selection = Set(items[min(anchorIndex, target)...max(anchorIndex, target)].map(\.id))
+            if selectionAnchor == nil { selectionAnchor = items[anchorIndex].id }
+        } else {
+            selection = [id]
+            selectionAnchor = id
+        }
+        focusedItem = id
+        return id
+    }
+
+    /// Click: selects one item, ⌘ toggles it, ⇧ extends from the anchor.
+    func click(_ id: ImageItem.ID, modifiers: NSEvent.ModifierFlags) {
+        if modifiers.contains(.command) {
+            if selection.remove(id) == nil { selection.insert(id) }
+            selectionAnchor = id
+        } else if modifiers.contains(.shift), let anchor = selectionAnchor.flatMap(index(of:)), let to = index(of: id) {
+            selection.formUnion(items[min(anchor, to)...max(anchor, to)].map(\.id))
+        } else {
+            selection = [id]
+            selectionAnchor = id
+        }
+        focusedItem = id
+    }
+
+    func index(of id: ImageItem.ID) -> Int? {
+        items.firstIndex { $0.id == id }
     }
 
     func clear() {
