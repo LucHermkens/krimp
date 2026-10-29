@@ -31,3 +31,71 @@ pub fn encode(rgba: &[u8], width: u32, height: u32, quality: u8) -> Result<Vec<u
 pub fn optimize(png: &[u8]) -> Result<Vec<u8>> {
     oxipng::optimize_from_memory(png, &options(false)).map_err(|e| format!("oxipng: {e}"))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testutil::*;
+
+    const COLOR_TYPE_OFFSET: usize = 25;
+    const INDEXED: u8 = 3;
+
+    #[test]
+    fn lossless_is_exact() {
+        let img = decode(&fixture("photos/kodim03.png"));
+        let png = encode(&img.rgba, img.width, img.height, 100).unwrap();
+        assert_eq!(decode_png(&png).rgba, img.rgba);
+    }
+
+    #[test]
+    fn lossy_quantizes_graphics_to_a_palette() {
+        let img = decode(&fixture("graphics/poster.png"));
+        let lossy = encode(&img.rgba, img.width, img.height, 90).unwrap();
+        let lossless = encode(&img.rgba, img.width, img.height, 100).unwrap();
+        assert_eq!(lossy[COLOR_TYPE_OFFSET], INDEXED);
+        assert!(lossy.len() < lossless.len(), "{} vs {}", lossy.len(), lossless.len());
+    }
+
+    #[test]
+    fn falls_back_to_full_colour_when_quality_unreachable() {
+        // Noise can't be represented in 256 colours at quality ≥ 70.
+        let mut state = 0x1234_5678u32;
+        let rgba: Vec<u8> = (0..64 * 64)
+            .flat_map(|_| {
+                state ^= state << 13;
+                state ^= state >> 17;
+                state ^= state << 5;
+                let b = state.to_le_bytes();
+                [b[0], b[1], b[2], 255]
+            })
+            .collect();
+        let png = encode(&rgba, 64, 64, 90).unwrap();
+        assert_ne!(png[COLOR_TYPE_OFFSET], INDEXED);
+        assert_eq!(decode_png(&png).rgba, rgba);
+    }
+
+    #[test]
+    fn optimize_keeps_pixels_and_strips_metadata() {
+        let original = fixture("graphics/ui-screenshot.png");
+        let tagged = insert_png_chunk(&original, b"tEXt", b"Comment\0secret");
+        let tagged = insert_png_chunk(&tagged, b"eXIf", b"MM\0*\0\0\0\x08\0\0");
+        assert!(png_chunks(&tagged).contains(&"tEXt".to_string()));
+
+        let optimized = optimize(&tagged).unwrap();
+        assert_eq!(decode_png(&optimized).rgba, decode_png(&original).rgba);
+        assert!(optimized.len() <= original.len());
+        let chunks = png_chunks(&optimized);
+        assert!(chunks.iter().all(|c| ["IHDR", "PLTE", "tRNS", "IDAT", "IEND"].contains(&c.as_str())), "{chunks:?}");
+    }
+
+    #[test]
+    fn keeps_alpha() {
+        let rgba = [[255u8, 0, 0, 255], [0, 0, 255, 128], [0, 0, 0, 0], [0, 255, 0, 255]].concat();
+        for q in [90, 100] {
+            let png = encode(&rgba, 2, 2, q).unwrap();
+            let px = decode_png(&png);
+            assert_eq!(px.pixel(0, 1)[3], 0);
+            assert!((i32::from(px.pixel(1, 0)[3]) - 128).abs() <= 2);
+        }
+    }
+}

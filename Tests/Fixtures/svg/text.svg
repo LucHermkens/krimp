@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="400" height="200" viewBox="0 0 400 200">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4facfe"/>
+      <stop offset="1" stop-color="#00f2fe"/>
+    </linearGradient>
+    <clipPath id="clip">
+      <rect x="10" y="10" width="380" height="180" rx="20"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#clip)">
+    <rect x="0" y="0" width="400" height="200" fill="url(#sky)"/>
+    <text x="200" y="90" font-family="Helvetica, Arial, sans-serif" font-size="44" font-weight="bold" text-anchor="middle" fill="#ffffff">Hello, Krimp</text>
+    <text x="200" y="140" font-family="Georgia, serif" font-size="22" font-style="italic" text-anchor="middle" fill="#003049">small files, same pixels</text>
+  </g>
+</svg>

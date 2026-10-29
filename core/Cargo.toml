@@ -33,6 +33,9 @@ cc = "1"
 cmake = "0.1"
 
 [dev-dependencies]
+image-webp = "0.2"
+png = "0.18"
+ssimulacra2 = "0.5"
 
 [profile.release]
 opt-level = 3

@@ -40,3 +40,28 @@ pub fn encode(rgba: &[u8], width: u32, height: u32, quality: u8) -> Result<Vec<u
     }
     Ok(out)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testutil::*;
+
+    #[test]
+    fn alpha_threshold_is_128() {
+        let rgba = [[255u8, 0, 0, 127], [0, 255, 0, 128], [0, 0, 255, 255], [9, 9, 9, 0]].concat();
+        let img = decode_gif(&encode(&rgba, 2, 2, 90).unwrap());
+        assert_eq!(img.pixel(0, 0)[3], 0);
+        assert_eq!(img.pixel(1, 0), [0, 255, 0, 255]);
+        assert_eq!(img.pixel(0, 1), [0, 0, 255, 255]);
+        assert_eq!(img.pixel(1, 1)[3], 0);
+    }
+
+    #[test]
+    fn photo_fits_in_256_colours() {
+        let src = decode(&fixture("photos/kodim23.png"));
+        let gif = encode(&src.rgba, src.width, src.height, 100).unwrap();
+        let out = decode_gif(&gif);
+        assert_eq!((out.width, out.height), (src.width, src.height));
+        assert!(gif.len() < src.rgba.len() / 2);
+    }
+}

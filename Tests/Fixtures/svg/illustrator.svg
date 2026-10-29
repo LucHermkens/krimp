@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 28.3.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="200px" height="200px" viewBox="0 0 200 200" enable-background="new 0 0 200 200" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill:#E94E1B;}
+	.st2{fill:none;stroke:#1D1D1B;stroke-width:4.0000;stroke-miterlimit:10.0000;}
+	.st3{fill:url(#SVGID_1_);}
+</style>
+<g id="Background">
+	<rect x="0.0000" y="0.0000" class="st0" width="200.0000" height="200.0000"/>
+</g>
+<g id="Artwork">
+	<g>
+		<linearGradient id="SVGID_1_" gradientUnits="userSpaceOnUse" x1="20.0000" y1="100.0000" x2="180.0000" y2="100.0000">
+			<stop  offset="0.0000" style="stop-color:#F9B233"/>
+			<stop  offset="1.0000" style="stop-color:#E94E1B"/>
+		</linearGradient>
+		<path class="st3" d="M100.0000,20.0000c44.1828,0,80.0000,35.8172,80.0000,80.0000s-35.8172,80.0000-80.0000,80.0000
+			S20.0000,144.1828,20.0000,100.0000S55.8172,20.0000,100.0000,20.0000z"/>
+	</g>
+	<g>
+		<polygon class="st0" points="100.0000,50.0000 120.0000,90.0000 165.0000,95.0000 130.0000,125.0000 140.0000,170.0000 
+			100.0000,147.0000 60.0000,170.0000 70.0000,125.0000 35.0000,95.0000 80.0000,90.0000 		"/>
+	</g>
+	<circle class="st2" cx="100.0000" cy="100.0000" r="88.0000"/>
+	<g>
+		<g>
+			<rect x="90.0000" y="95.0000" class="st1" width="20.0000" height="20.0000"/>
+		</g>
+	</g>
+</g>
+</svg>

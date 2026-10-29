@@ -16,6 +16,8 @@ pub mod jpeg;
 pub mod png;
 mod quant;
 pub mod svg;
+#[cfg(test)]
+mod testutil;
 pub mod webp;
 
 pub type Result<T> = std::result::Result<T, String>;
@@ -62,6 +64,11 @@ impl KrimpBuffer {
 pub const KRIMP_FEATURE_AVIF: u32 = 1 << 0;
 /// Bit for `krimp_available_features`: SVG minification is compiled in.
 pub const KRIMP_FEATURE_SVG_MIN: u32 = 1 << 1;
+
+/// SVG minify safety net: the largest per-channel difference allowed between renders.
+pub const KRIMP_SVG_MAX_DIFF: u8 = 8;
+/// SVG minify safety net: the largest mean absolute difference allowed between renders.
+pub const KRIMP_SVG_MEAN_DIFF: f32 = 0.5;
 
 thread_local! {
     static LAST_ERROR: RefCell<CString> = RefCell::new(CString::default());
@@ -299,5 +306,38 @@ mod tests {
         assert_eq!(status, -1);
         let msg = unsafe { std::ffi::CStr::from_ptr(krimp_last_error()) };
         assert!(msg.to_str().unwrap().contains("zero size"));
+    }
+
+    #[test]
+    fn quality_report_at_90() {
+        use crate::testutil::*;
+        let fixtures = [
+            "photos/kodim03.png",
+            "photos/kodim15.png",
+            "photos/kodim23.png",
+            "graphics/ui-screenshot.png",
+            "graphics/poster.png",
+        ];
+        let formats = [
+            ("JPEG", KrimpFormat::KRIMP_JPEG, 65.0),
+            ("PNG", KrimpFormat::KRIMP_PNG, 0.0),
+            ("WebP", KrimpFormat::KRIMP_WEBP, 65.0),
+            #[cfg(feature = "avif")]
+            ("AVIF", KrimpFormat::KRIMP_AVIF, 65.0),
+            ("GIF", KrimpFormat::KRIMP_GIF, 0.0),
+        ];
+        println!("| Fixture | Format | Size | bpp | SSIMULACRA2 |\n|---|---|---|---|---|");
+        for name in fixtures {
+            let src = decode(&fixture(name));
+            for (label, format, floor) in formats {
+                let opts = KrimpOptions { format, quality: 90, progressive: true };
+                let bytes = encode(&src.rgba, src.width, src.height, opts).unwrap();
+                let score = ssimulacra2(&src, &decode(&bytes));
+                let bpp = bytes.len() as f64 * 8.0 / f64::from(src.width * src.height);
+                let flag = if score < 70.0 { " ⚠ low" } else { "" };
+                println!("| {name} | {label} | {} B | {bpp:.2} | {score:.1}{flag} |", bytes.len());
+                assert!(score >= floor, "{name} {label}: {score:.1} < {floor}");
+            }
+        }
     }
 }

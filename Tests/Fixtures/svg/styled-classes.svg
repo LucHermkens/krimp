@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160" viewBox="0 0 320 160">
+  <title>Status badges</title>
+  <desc>Three badges styled through classes in a style element.</desc>
+  <style>
+    .badge { stroke: #222222; stroke-width: 2px; }
+    .ok { fill: #2ecc71; }
+    .warn { fill: #f1c40f; }
+    .err { fill: #e74c3c; }
+    .ok, .warn, .err { opacity: 1.0; }
+    #frame { fill: none; stroke: #888888; stroke-dasharray: 6 4; }
+    @media (prefers-color-scheme: dark) { .badge { stroke: #dddddd; } }
+  </style>
+  <rect id="frame" x="5" y="5" width="310" height="150" rx="12"/>
+  <g transform="translate(20 40)">
+    <rect class="badge ok" x="0" y="0" width="80" height="80" rx="16"/>
+    <rect class="badge warn" x="100" y="0" width="80" height="80" rx="16"/>
+    <rect class="badge err" x="200" y="0" width="80" height="80" rx="16"/>
+  </g>
+</svg>

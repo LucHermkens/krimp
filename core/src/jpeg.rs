@@ -159,3 +159,68 @@ pub fn estimate_quality(jpeg: &[u8]) -> Option<u8> {
         .min_by(|a, b| a.1.total_cmp(&b.1))?;
     (error <= MAX_MEAN_RELATIVE_ERROR).then_some(quality)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testutil::*;
+
+    /// Marker types before the first scan.
+    fn markers(jpeg: &[u8]) -> Vec<u8> {
+        let mut found = Vec::new();
+        let mut i = 2;
+        while i + 4 <= jpeg.len() && jpeg[i] == 0xFF {
+            let marker = jpeg[i + 1];
+            found.push(marker);
+            if marker == 0xDA {
+                break;
+            }
+            i += 2 + usize::from(u16::from_be_bytes([jpeg[i + 2], jpeg[i + 3]]));
+        }
+        found
+    }
+
+    #[test]
+    fn estimates_libjpeg_quality_within_3() {
+        for q in [60, 75, 85, 95] {
+            let estimate = estimate_quality(&fixture(&format!("jpeg/kodim23-q{q}.jpg"))).expect("standard table");
+            println!("libjpeg q{q} → estimated q{estimate}");
+            assert!((i32::from(estimate) - q).abs() <= 3, "q{q} estimated as {estimate}");
+        }
+    }
+
+    #[test]
+    fn rejects_missing_tables() {
+        assert_eq!(estimate_quality(b"not a jpeg"), None);
+        assert_eq!(estimate_quality(&[0xFF, 0xD8, 0xFF, 0xD9]), None);
+    }
+
+    #[test]
+    fn ijg_tables_match_libjpeg() {
+        assert_eq!(ijg_table(50), STD_LUMA);
+        assert!(ijg_table(100).iter().all(|&v| v == 1));
+    }
+
+    #[test]
+    fn progressive_toggle_and_no_metadata() {
+        let img = decode(&fixture("photos/kodim03.png"));
+        let progressive = encode(&img.rgba, img.width, img.height, 90, true).unwrap();
+        let baseline = encode(&img.rgba, img.width, img.height, 90, false).unwrap();
+        assert!(markers(&progressive).contains(&0xC2));
+        assert!(markers(&baseline).contains(&0xC0));
+        for jpeg in [&progressive, &baseline] {
+            // Only JFIF (APP0) may appear; no Exif/XMP (APP1), ICC (APP2) or others.
+            assert!(markers(jpeg).iter().all(|m| !(0xE1..=0xEF).contains(m)), "{:x?}", markers(jpeg));
+        }
+        // jpegli output re-estimates to something sane (informational).
+        println!("jpegli q90 → estimated {:?}", estimate_quality(&progressive));
+    }
+
+    #[test]
+    fn flattens_transparency_over_white() {
+        let rgba = [0u8, 0, 0, 0].repeat(64);
+        let jpeg = encode(&rgba, 8, 8, 90, true).unwrap();
+        let px = decode(&jpeg).pixel(4, 4);
+        assert!(px[..3].iter().all(|&c| c >= 250), "{px:?}");
+    }
+}

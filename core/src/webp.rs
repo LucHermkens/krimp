@@ -62,3 +62,52 @@ pub fn encode(rgba: &[u8], width: u32, height: u32, quality: u8) -> Result<Vec<u
         Ok(bytes)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testutil::*;
+
+    fn chunks(webp: &[u8]) -> Vec<String> {
+        let mut found = Vec::new();
+        let mut i = 12;
+        while i + 8 <= webp.len() {
+            found.push(String::from_utf8_lossy(&webp[i..i + 4]).into_owned());
+            let len = u32::from_le_bytes(webp[i + 4..i + 8].try_into().unwrap()) as usize;
+            i += 8 + len + (len & 1);
+        }
+        found
+    }
+
+    #[test]
+    fn lossy_below_100_lossless_at_100() {
+        let img = decode(&fixture("photos/kodim15.png"));
+        let lossy = encode(&img.rgba, img.width, img.height, 90).unwrap();
+        let lossless = encode(&img.rgba, img.width, img.height, 100).unwrap();
+        assert_eq!(chunks(&lossy), ["VP8 "]);
+        assert_eq!(chunks(&lossless), ["VP8L"]);
+        assert_eq!(decode_webp(&lossless).rgba, img.rgba);
+    }
+
+    #[test]
+    fn lossless_is_exact_under_transparency() {
+        let rgba = [[10u8, 20, 30, 0], [40, 50, 60, 255], [70, 80, 90, 128], [1, 2, 3, 0]].concat();
+        let webp = encode(&rgba, 2, 2, 100).unwrap();
+        assert_eq!(decode_webp(&webp).rgba, rgba);
+    }
+
+    #[test]
+    fn lossy_keeps_alpha() {
+        let rgba = [[255u8, 0, 0, 0], [255, 0, 0, 255]].concat().repeat(32);
+        let webp = encode(&rgba, 8, 8, 90).unwrap();
+        assert!(chunks(&webp).contains(&"ALPH".to_string()));
+        let img = decode_webp(&webp);
+        assert_eq!(img.pixel(0, 0)[3], 0);
+        assert_eq!(img.pixel(1, 0)[3], 255);
+    }
+
+    #[test]
+    fn rejects_oversized() {
+        assert!(encode(&[0; 4], 20_000, 1, 90).is_err());
+    }
+}
