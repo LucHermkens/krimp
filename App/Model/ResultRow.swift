@@ -3,8 +3,11 @@ import Foundation
 /// One row of the results table: a snapshot of an item with sortable keys.
 struct ResultRow: Identifiable, Sendable {
     let id: UUID
-    let name: String
-    let conversion: String
+    /// The file as it was added.
+    let input: String
+    /// The file written, or before processing the name it will get (see `outputIsPlanned`).
+    let output: String
+    let outputIsPlanned: Bool
     let dimensions: String
     let pixelCount: Int
     let oldSize: Int64
@@ -21,12 +24,11 @@ struct ResultRow: Identifiable, Sendable {
     @MainActor
     init(item: ImageItem, options: ProcessingOptions) {
         id = item.id
-        name = item.name
+        input = item.originalURL.lastPathComponent
         let source = item.source
         let result = item.result
-        let from = source?.formatName ?? item.url.pathExtension.uppercased()
         let to = result?.format ?? source.flatMap { OutputPlan.previewFormat(for: $0, options: options) }
-        conversion = to.map { "\(from) → \($0.name)" } ?? from
+        (output, outputIsPlanned) = Self.output(for: item, format: to, options: options)
 
         if let source {
             let old = "\(source.pixelWidth)×\(source.pixelHeight)"
@@ -61,6 +63,29 @@ struct ResultRow: Identifiable, Sendable {
             (status, detail, isError) = (r.statusText, r.detail, failed)
         }
     }
+
+    /// The written file's name, or the name it would get with the current settings.
+    @MainActor
+    private static func output(for item: ImageItem, format: ImageFormat?, options: ProcessingOptions) -> (String, Bool) {
+        switch item.state {
+        case .finished(let result):
+            switch result.outcome {
+            case .written(let url): return (url.lastPathComponent, false)
+            case .alreadyOptimal: return ("Unchanged", false)
+            default: return ("—", false)
+            }
+        case .unsupported:
+            return ("—", false)
+        default:
+            guard let format else { return ("—", true) }
+            let source = item.originalURL
+            let ext = Writer.outputExtension(for: source, format: format)
+            let name = options.outputMode == .copy
+                ? Writer.copyName(for: source, ext: ext, prefix: options.prefix, suffix: options.suffix)
+                : source.deletingPathExtension().appendingPathExtension(ext).lastPathComponent
+            return (name, true)
+        }
+    }
 }
 
 /// Summed old/new size over processed rows.
@@ -84,12 +109,12 @@ enum MarkdownExport {
     /// The results table plus totals, as a Markdown table.
     static func table(rows: [ResultRow], totals: ResultTotals) -> String {
         var lines = [
-            "| Name | Conversion | Dimensions | Old size | New size | % | Status |",
+            "| Input | Output | Dimensions | Old size | New size | % | Status |",
             "|---|---|---|---:|---:|---:|---|",
         ]
         func cell(_ text: String) -> String { text.replacingOccurrences(of: "|", with: "\\|") }
         for row in rows {
-            lines.append("| \(cell(row.name)) | \(row.conversion) | \(row.dimensions) | \(Formatting.bytes(row.oldSize)) | "
+            lines.append("| \(cell(row.input)) | \(cell(row.output)) | \(row.dimensions) | \(Formatting.bytes(row.oldSize)) | "
                 + "\(row.newSize.map(Formatting.bytes) ?? "—") | \(row.percent.map(Formatting.percent) ?? "—") | \(row.status) |")
         }
         lines.append("| **Total (\(totals.count) processed)** | | | \(Formatting.bytes(totals.oldSize)) | "

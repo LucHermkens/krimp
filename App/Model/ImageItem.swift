@@ -20,8 +20,12 @@ final class ImageItem: Identifiable {
     var thumbnail: CGImage?
     var state = State.loading
 
+    /// The file as it was added (Replace mode moves `url` to the output).
+    let originalURL: URL
+
     init(url: URL) {
         self.url = url
+        self.originalURL = url
     }
 
     var name: String { url.lastPathComponent }

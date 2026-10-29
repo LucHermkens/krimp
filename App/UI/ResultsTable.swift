@@ -2,19 +2,26 @@ import SwiftUI
 
 struct ResultsTable: View {
     @Environment(AppModel.self) private var model
-    @State private var sortOrder = [KeyPathComparator(\ResultRow.name, comparator: .localizedStandard)]
+    @State private var sortOrder = [KeyPathComparator(\ResultRow.input, comparator: .localizedStandard)]
+    @FocusState private var focused: Bool
 
     var body: some View {
         @Bindable var model = model
         let rows = model.rows().sorted(using: sortOrder)
         VStack(spacing: 0) {
             Table(rows, selection: $model.selection, sortOrder: $sortOrder) {
-                TableColumn("Name", value: \.name, comparator: .localizedStandard) { row in
-                    Text(row.name).lineLimit(1).truncationMode(.middle).help(row.name)
+                TableColumn("Input", value: \.input, comparator: .localizedStandard) { row in
+                    Text(row.input).lineLimit(1).truncationMode(.middle).help(row.input)
                 }
-                .width(min: 110, ideal: 170)
-                TableColumn("Conversion", value: \.conversion)
-                    .width(min: 80, ideal: 100)
+                .width(min: 100, ideal: 160)
+                TableColumn("Output", value: \.output, comparator: .localizedStandard) { row in
+                    Text(row.output)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .foregroundStyle(row.outputIsPlanned ? .secondary : .primary)
+                        .help(row.outputIsPlanned ? "Will be saved as \(row.output)" : row.output)
+                }
+                .width(min: 100, ideal: 160)
                 TableColumn("Dimensions", value: \.pixelCount) { row in
                     Text(row.dimensions)
                 }
@@ -41,7 +48,15 @@ struct ResultsTable: View {
                 .width(min: 60, ideal: 100)
             }
             .monospacedDigit()
+            .focused($focused)
+            // NSTableView ignores Backspace, so handle the delete keys here.
+            .onKeyPress(keys: [.delete, .deleteForward]) { _ in
+                guard !model.selection.isEmpty, !model.isRunning else { return .ignored }
+                model.removeSelection()
+                return .handled
+            }
             .onDeleteCommand { model.removeSelection() }
+            .onAppear { focused = true }
             .contextMenu(forSelectionType: ImageItem.ID.self) { ids in
                 if !ids.isEmpty {
                     ItemMenu(ids: ids)
