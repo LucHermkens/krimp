@@ -9,7 +9,7 @@ XCODEBUILD = xcodebuild -project Krimp.xcodeproj -scheme Krimp -derivedDataPath 
 export PATH := $(HOME)/.cargo/bin:/opt/homebrew/bin:$(PATH)
 export MACOSX_DEPLOYMENT_TARGET := 26.0
 
-.PHONY: all bootstrap core project app run test test-core test-app size notices clean
+.PHONY: all bootstrap core project app run test test-core test-app fixtures size notices clean
 
 all: app
 
@@ -40,6 +40,13 @@ run: app
 	open $(APP)
 
 test: test-core test-app
+
+## Large optional test fixtures (git-ignored). CC0 sample from raw.pixls.us.
+fixtures: Tests/Fixtures/downloaded/iphone-xs.dng
+
+Tests/Fixtures/downloaded/iphone-xs.dng:
+	mkdir -p $(@D)
+	curl -fL -o $@ "https://raw.pixls.us/data/Apple/iPhone%20XS/IMG_1105.dng"
 
 test-core:
 	cd core && cargo test --release --target aarch64-apple-darwin
