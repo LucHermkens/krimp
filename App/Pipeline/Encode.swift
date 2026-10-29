@@ -4,12 +4,13 @@ import UniformTypeIdentifiers
 
 enum Encode {
     /// Encodes pixels into `format`. `quality` is 1–100 (100 = lossless where supported).
-    static func raster(_ bitmap: Bitmap, format: ImageFormat, quality: Int, progressive: Bool) throws -> Data {
+    static func raster(_ bitmap: Bitmap, format: ImageFormat, quality: Int, progressive: Bool,
+                       maxEffort: Bool = false) throws -> Data {
         if format == .tiff { return try tiff(bitmap) }
         guard let codec = format.codec else { throw DecodeError.unreadable("\(format.name) can't encode pixels") }
         let straight = bitmap.unpremultiplied()
         return try Core.encode(rgba: straight.data, width: straight.width, height: straight.height, codec: codec,
-                               quality: quality, progressive: progressive)
+                               quality: quality, progressive: progressive, maxEffort: maxEffort)
     }
 
     /// LZW-compressed TIFF via ImageIO, with no metadata and no embedded colour profile.

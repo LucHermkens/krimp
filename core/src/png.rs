@@ -1,17 +1,20 @@
 //! PNG: imagequant palette quantisation (lossy) followed by an oxipng pass.
 
 use crate::{Result, quant};
-use oxipng::{BitDepth, ColorType, Options, RawImage, StripChunks};
+use oxipng::{BitDepth, ColorType, Deflater, Options, RawImage, StripChunks, ZopfliOptions};
 
-fn options(lossy: bool) -> Options {
+fn options(lossy: bool, max_effort: bool) -> Options {
     let mut opts = Options::from_preset(4);
+    if max_effort {
+        opts.deflater = Deflater::Zopfli(ZopfliOptions::default());
+    }
     opts.strip = StripChunks::All;
     // Rewriting RGB under fully transparent pixels is invisible, but keep lossless output exact.
     opts.optimize_alpha = lossy;
     opts
 }
 
-pub fn encode(rgba: &[u8], width: u32, height: u32, quality: u8) -> Result<Vec<u8>> {
+pub fn encode(rgba: &[u8], width: u32, height: u32, quality: u8, max_effort: bool) -> Result<Vec<u8>> {
     if quality < 100 {
         let pixels = quant::as_pixels(rgba);
         let min = quality.saturating_sub(20);
@@ -19,17 +22,17 @@ pub fn encode(rgba: &[u8], width: u32, height: u32, quality: u8) -> Result<Vec<u
             let palette = q.palette.iter().map(|c| rgb::RGBA8::new(c.r, c.g, c.b, c.a)).collect();
             let raw = RawImage::new(width, height, ColorType::Indexed { palette }, BitDepth::Eight, q.indices)
                 .map_err(|e| format!("oxipng: {e}"))?;
-            return raw.create_optimized_png(&options(true)).map_err(|e| format!("oxipng: {e}"));
+            return raw.create_optimized_png(&options(true, max_effort)).map_err(|e| format!("oxipng: {e}"));
         }
     }
     let raw = RawImage::new(width, height, ColorType::RGBA, BitDepth::Eight, rgba.to_vec())
         .map_err(|e| format!("oxipng: {e}"))?;
-    raw.create_optimized_png(&options(false)).map_err(|e| format!("oxipng: {e}"))
+    raw.create_optimized_png(&options(false, max_effort)).map_err(|e| format!("oxipng: {e}"))
 }
 
 /// Lossless re-optimisation of an existing PNG; pixel data stays bit-identical.
-pub fn optimize(png: &[u8]) -> Result<Vec<u8>> {
-    oxipng::optimize_from_memory(png, &options(false)).map_err(|e| format!("oxipng: {e}"))
+pub fn optimize(png: &[u8], max_effort: bool) -> Result<Vec<u8>> {
+    oxipng::optimize_from_memory(png, &options(false, max_effort)).map_err(|e| format!("oxipng: {e}"))
 }
 
 #[cfg(test)]
@@ -43,15 +46,15 @@ mod tests {
     #[test]
     fn lossless_is_exact() {
         let img = decode(&fixture("photos/kodim03.png"));
-        let png = encode(&img.rgba, img.width, img.height, 100).unwrap();
+        let png = encode(&img.rgba, img.width, img.height, 100, false).unwrap();
         assert_eq!(decode_png(&png).rgba, img.rgba);
     }
 
     #[test]
     fn lossy_quantizes_graphics_to_a_palette() {
         let img = decode(&fixture("graphics/poster.png"));
-        let lossy = encode(&img.rgba, img.width, img.height, 90).unwrap();
-        let lossless = encode(&img.rgba, img.width, img.height, 100).unwrap();
+        let lossy = encode(&img.rgba, img.width, img.height, 90, false).unwrap();
+        let lossless = encode(&img.rgba, img.width, img.height, 100, false).unwrap();
         assert_eq!(lossy[COLOR_TYPE_OFFSET], INDEXED);
         assert!(lossy.len() < lossless.len(), "{} vs {}", lossy.len(), lossless.len());
     }
@@ -69,7 +72,7 @@ mod tests {
                 [b[0], b[1], b[2], 255]
             })
             .collect();
-        let png = encode(&rgba, 64, 64, 90).unwrap();
+        let png = encode(&rgba, 64, 64, 90, false).unwrap();
         assert_ne!(png[COLOR_TYPE_OFFSET], INDEXED);
         assert_eq!(decode_png(&png).rgba, rgba);
     }
@@ -81,7 +84,7 @@ mod tests {
         let tagged = insert_png_chunk(&tagged, b"eXIf", b"MM\0*\0\0\0\x08\0\0");
         assert!(png_chunks(&tagged).contains(&"tEXt".to_string()));
 
-        let optimized = optimize(&tagged).unwrap();
+        let optimized = optimize(&tagged, false).unwrap();
         assert_eq!(decode_png(&optimized).rgba, decode_png(&original).rgba);
         assert!(optimized.len() <= original.len());
         let chunks = png_chunks(&optimized);
@@ -92,10 +95,20 @@ mod tests {
     fn keeps_alpha() {
         let rgba = [[255u8, 0, 0, 255], [0, 0, 255, 128], [0, 0, 0, 0], [0, 255, 0, 255]].concat();
         for q in [90, 100] {
-            let png = encode(&rgba, 2, 2, q).unwrap();
+            let png = encode(&rgba, 2, 2, q, false).unwrap();
             let px = decode_png(&png);
             assert_eq!(px.pixel(0, 1)[3], 0);
             assert!((i32::from(px.pixel(1, 0)[3]) - 128).abs() <= 2);
         }
+    }
+
+    #[test]
+    fn max_effort_is_smaller_and_lossless() {
+        let original = fixture("graphics/ui-screenshot.png");
+        let normal = optimize(&original, false).unwrap();
+        let zopfli = optimize(&original, true).unwrap();
+        println!("oxipng {} B, zopfli {} B", normal.len(), zopfli.len());
+        assert!(zopfli.len() <= normal.len());
+        assert_eq!(decode_png(&zopfli).rgba, decode_png(&original).rgba);
     }
 }

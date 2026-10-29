@@ -71,7 +71,8 @@ enum Pipeline {
             // SVG → raster: render straight at the target size (upscaling allowed).
             let rgba = try Core.renderSVG(data, width: target.width, height: target.height)
             let bitmap = Bitmap(straight: rgba, width: target.width, height: target.height)
-            let output = try Encode.raster(bitmap, format: plan.format, quality: plan.quality, progressive: plan.progressive)
+            let output = try Encode.raster(bitmap, format: plan.format, quality: plan.quality, progressive: plan.progressive,
+                                            maxEffort: plan.maxEffort)
             return EncodedOutput(data: output, plan: plan, width: target.width, height: target.height, resized: resized)
 
         case .raster:
@@ -79,7 +80,7 @@ enum Pipeline {
 
             // Lossless PNG → PNG without resizing: optimise the original bytes; pixels stay identical.
             if source.isPlainPNG && !source.isAnimated && plan.format == .png && plan.quality == 100 && !resized {
-                let output = try Core.optimizePNG(data)
+                let output = try Core.optimizePNG(data, maxEffort: plan.maxEffort)
                 return EncodedOutput(data: output, plan: plan, width: target.width, height: target.height, resized: false)
             }
 
@@ -91,7 +92,8 @@ enum Pipeline {
             if resized {
                 bitmap = try Resize.scale(bitmap, width: target.width, height: target.height)
             }
-            let output = try Encode.raster(bitmap, format: plan.format, quality: plan.quality, progressive: plan.progressive)
+            let output = try Encode.raster(bitmap, format: plan.format, quality: plan.quality, progressive: plan.progressive,
+                                            maxEffort: plan.maxEffort)
             return EncodedOutput(data: output, plan: plan, width: bitmap.width, height: bitmap.height, resized: resized)
         }
     }

@@ -374,6 +374,18 @@ func options(_ configure: (inout ProcessingOptions) -> Void = { _ in }) -> Proce
         #expect(try FileManager.default.contentsOfDirectory(atPath: url.deletingLastPathComponent().path).count == 1)
     }
 
+    @Test func pngMaxEffortUsesZopfliAndStaysLossless() throws {
+        let url = Fixtures.url("graphics/ui-screenshot.png")
+        let source = try Decode.probe(url)
+        let normal = try Pipeline.encode(source, options: options { $0.quality = 100 })
+        let zopfli = try Pipeline.encode(source, options: options { $0.quality = 100; $0.pngMaxEffort = true })
+        #expect(zopfli.plan.maxEffort && !normal.plan.maxEffort)
+        #expect(zopfli.data.count < normal.data.count)
+        #expect(try Fixtures.pixels(zopfli.data).data == (try Fixtures.pixels(try Data(contentsOf: url))).data)
+        // Only applies to PNG output.
+        #expect(try !Pipeline.encode(source, options: options { $0.format = .webp; $0.pngMaxEffort = true }).plan.maxEffort)
+    }
+
     @Test func pngShortcutKeepsPixelsIdentical() throws {
         let url = Fixtures.url("graphics/ui-screenshot.png")
         let source = try Decode.probe(url)

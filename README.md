@@ -21,6 +21,7 @@ originals or save a copy next to each one.
   SVGs render sharp at any size.
 - **Format**: *Same as original* or JPEG, PNG, WebP, AVIF, GIF, TIFF, SVG, with a quality
   slider (default 90). Turn the card off to resize only, keeping each file's format and quality.
+  *Max effort for PNG* switches to Zopfli: usually a few percent smaller, many times slower.
 - **Output**: *Replace original* moves the original to the Trash; *Save copy* writes
   `<prefix><name><suffix>.<ext>` next to it and never overwrites anything.
   *Skip if larger* keeps the original when re-encoding in the same format doesn't help.

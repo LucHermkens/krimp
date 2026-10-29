@@ -118,6 +118,10 @@ private struct FormatCard: View {
             if settings.format == .jpeg {
                 Toggle("Progressive", isOn: $settings.progressive)
             }
+            if settings.format == .png || settings.format == .same {
+                Toggle("Max effort for PNG (slow)", isOn: $settings.pngMaxEffort)
+                    .help("Uses Zopfli: usually a few percent smaller, but many times slower")
+            }
         }
     }
 

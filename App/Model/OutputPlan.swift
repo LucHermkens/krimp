@@ -8,6 +8,8 @@ struct OutputPlan: Sendable, Equatable {
     var progressive: Bool
     /// SVG output only.
     var minify: Bool
+    /// PNG only: Zopfli instead of libdeflate.
+    var maxEffort = false
 
     /// The quality used for JPEG re-encodes when the source quality can't be estimated.
     static let fallbackJPEGQuality = 95
@@ -33,7 +35,8 @@ struct OutputPlan: Sendable, Equatable {
             let format = options.format == .same ? same : ImageFormat(rawValue: options.format.rawValue)!
             if format == .svg && source.kind != .svg { throw ItemIssue.skipped("Can't convert raster to SVG") }
             return OutputPlan(format: format, quality: format.usesQuality ? options.quality : 100,
-                              progressive: options.progressive, minify: format == .svg)
+                              progressive: options.progressive, minify: format == .svg,
+                              maxEffort: format == .png && options.pngMaxEffort)
         }
 
         // Format card off: keep format and quality.

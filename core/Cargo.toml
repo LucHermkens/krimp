@@ -21,7 +21,7 @@ flate2 = "1"
 gif = { version = "0.14.2", default-features = false, features = ["std"] }
 imagequant = { version = "4.4.1", default-features = false, features = ["threads"] }
 libwebp-sys = { version = "0.14.4", default-features = false, features = ["std", "parallel", "neon"] }
-oxipng = { version = "10.2.1", default-features = false, features = ["parallel"] }
+oxipng = { version = "10.2.1", default-features = false, features = ["parallel", "zopfli"] }
 oxvg_ast = { version = "=0.0.9", optional = true, features = ["roxmltree"] }
 oxvg_optimiser = { version = "=0.0.9", optional = true }
 ravif = { version = "0.13.0", optional = true }

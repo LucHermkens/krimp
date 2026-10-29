@@ -16,11 +16,11 @@ fn main() {
             KrimpFormat::KRIMP_GIF,
             KrimpFormat::KRIMP_AVIF,
         ] {
-            let opts = KrimpOptions { format: black_box(format), quality: black_box(90), progressive: true };
+            let opts = KrimpOptions { format: black_box(format), quality: black_box(90), progressive: true, max_effort: black_box(false) };
             krimp_encode(px.as_ptr(), 2, 2, opts, &mut out);
             krimp_buffer_free(std::mem::replace(&mut out, KrimpBuffer { ptr: std::ptr::null_mut(), len: 0 }));
         }
-        krimp_optimize_png(px.as_ptr(), px.len(), &mut out);
+        krimp_optimize_png(px.as_ptr(), px.len(), black_box(true), &mut out);
         black_box(krimp_jpeg_estimate_quality(px.as_ptr(), px.len()));
         krimp_svg_size(px.as_ptr(), px.len(), &mut w, &mut h);
         krimp_svg_render(px.as_ptr(), px.len(), 2, 2, &mut out);

@@ -36,9 +36,11 @@ enum Core {
         .split(separator: ",").map(String.init)
 
     /// Encodes 8-bit sRGB RGBA with straight alpha and a `width * 4` stride.
-    static func encode(rgba: Data, width: Int, height: Int, codec: Codec, quality: Int, progressive: Bool) throws -> Data {
+    static func encode(rgba: Data, width: Int, height: Int, codec: Codec, quality: Int, progressive: Bool,
+                       maxEffort: Bool = false) throws -> Data {
         precondition(rgba.count == width * height * 4)
-        let options = KrimpOptions(format: codec.raw, quality: UInt8(clamping: quality), progressive: progressive)
+        let options = KrimpOptions(format: codec.raw, quality: UInt8(clamping: quality), progressive: progressive,
+                                   max_effort: maxEffort)
         return try output { out in
             rgba.withUnsafeBytes { raw in
                 krimp_encode(raw.baseAddress!.assumingMemoryBound(to: UInt8.self), UInt32(width), UInt32(height), options, out)
@@ -47,8 +49,9 @@ enum Core {
     }
 
     /// Lossless oxipng pass over existing PNG bytes; pixels stay bit-identical.
-    static func optimizePNG(_ png: Data) throws -> Data {
-        try output { out in png.withBytes { krimp_optimize_png($0, $1, out) } }
+    /// `maxEffort` uses Zopfli: a few percent smaller, many times slower.
+    static func optimizePNG(_ png: Data, maxEffort: Bool = false) throws -> Data {
+        try output { out in png.withBytes { krimp_optimize_png($0, $1, maxEffort, out) } }
     }
 
     /// IJG-equivalent quality from the luma quantisation table, or nil for non-standard tables.

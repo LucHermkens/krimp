@@ -56,6 +56,7 @@ struct ProcessingOptions: Sendable, Equatable {
     var format = FormatChoice.same
     var quality = 90
     var progressive = true
+    var pngMaxEffort = false
     var outputMode = OutputMode.replace
     var prefix = ""
     var suffix = "-small"
@@ -72,6 +73,7 @@ final class Settings {
     var format: FormatChoice { didSet { store(format.rawValue, .format) } }
     var quality: Int { didSet { store(quality, .quality) } }
     var progressive: Bool { didSet { store(progressive, .progressive) } }
+    var pngMaxEffort: Bool { didSet { store(pngMaxEffort, .pngMaxEffort) } }
     var outputMode: OutputMode { didSet { store(outputMode.rawValue, .outputMode) } }
     var prefix: String { didSet { store(prefix, .prefix) } }
     var suffix: String { didSet { store(suffix, .suffix) } }
@@ -79,7 +81,7 @@ final class Settings {
     var viewMode: ViewMode { didSet { store(viewMode.rawValue, .viewMode) } }
 
     private enum Key: String {
-        case resizeEnabled, resizeMode, resizeValue, formatEnabled, format, quality, progressive
+        case resizeEnabled, resizeMode, resizeValue, formatEnabled, format, quality, progressive, pngMaxEffort
         case outputMode, prefix, suffix, skipIfLarger, viewMode
     }
 
@@ -96,6 +98,7 @@ final class Settings {
         format = FormatChoice(rawValue: value(.format, "")) ?? d.format
         quality = value(.quality, d.quality)
         progressive = value(.progressive, d.progressive)
+        pngMaxEffort = value(.pngMaxEffort, d.pngMaxEffort)
         outputMode = OutputMode(rawValue: value(.outputMode, "")) ?? d.outputMode
         prefix = value(.prefix, d.prefix)
         suffix = value(.suffix, d.suffix)
@@ -110,7 +113,7 @@ final class Settings {
     var options: ProcessingOptions {
         ProcessingOptions(
             resizeEnabled: resizeEnabled, resizeMode: resizeMode, resizeValue: resizeValue,
-            formatEnabled: formatEnabled, format: format, quality: quality, progressive: progressive,
+            formatEnabled: formatEnabled, format: format, quality: quality, progressive: progressive, pngMaxEffort: pngMaxEffort,
             outputMode: outputMode, prefix: prefix, suffix: suffix, skipIfLarger: skipIfLarger)
     }
 

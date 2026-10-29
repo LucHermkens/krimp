@@ -42,6 +42,8 @@ pub struct KrimpOptions {
     pub quality: u8,
     /// JPEG only.
     pub progressive: bool,
+    /// PNG only: compress with Zopfli instead of libdeflate (much slower, a few % smaller).
+    pub max_effort: bool,
 }
 
 #[repr(C)]
@@ -121,7 +123,7 @@ pub fn encode(rgba: &[u8], width: u32, height: u32, opts: KrimpOptions) -> Resul
     let quality = opts.quality.clamp(1, 100);
     match opts.format {
         KrimpFormat::KRIMP_JPEG => jpeg::encode(rgba, width, height, quality, opts.progressive),
-        KrimpFormat::KRIMP_PNG => png::encode(rgba, width, height, quality),
+        KrimpFormat::KRIMP_PNG => png::encode(rgba, width, height, quality, opts.max_effort),
         KrimpFormat::KRIMP_WEBP => webp::encode(rgba, width, height, quality),
         KrimpFormat::KRIMP_GIF => gif::encode(rgba, width, height, quality),
         #[cfg(feature = "avif")]
@@ -152,10 +154,10 @@ pub unsafe extern "C" fn krimp_encode(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn krimp_optimize_png(png: *const u8, len: usize, out: *mut KrimpBuffer) -> i32 {
+pub unsafe extern "C" fn krimp_optimize_png(png: *const u8, len: usize, max_effort: bool, out: *mut KrimpBuffer) -> i32 {
     ffi_call(|| {
         let input = unsafe { slice(png, len)? };
-        let bytes = png::optimize(input)?;
+        let bytes = png::optimize(input, max_effort)?;
         unsafe { *out = KrimpBuffer::from_vec(bytes) };
         Ok(())
     })
@@ -291,7 +293,7 @@ mod tests {
         ];
         for (format, magic) in formats {
             for quality in [90, 100] {
-                let opts = KrimpOptions { format, quality, progressive: true };
+                let opts = KrimpOptions { format, quality, progressive: true, max_effort: false };
                 let bytes = encode(&PIXELS, 2, 2, opts).unwrap_or_else(|e| panic!("{format:?}: {e}"));
                 assert!(bytes.starts_with(magic), "{format:?} q{quality}");
             }
@@ -301,7 +303,7 @@ mod tests {
     #[test]
     fn ffi_reports_errors() {
         let mut out = KrimpBuffer { ptr: std::ptr::null_mut(), len: 0 };
-        let opts = KrimpOptions { format: KrimpFormat::KRIMP_PNG, quality: 90, progressive: false };
+        let opts = KrimpOptions { format: KrimpFormat::KRIMP_PNG, quality: 90, progressive: false, max_effort: false };
         let status = unsafe { krimp_encode(PIXELS.as_ptr(), 0, 2, opts, &mut out) };
         assert_eq!(status, -1);
         let msg = unsafe { std::ffi::CStr::from_ptr(krimp_last_error()) };
@@ -330,7 +332,7 @@ mod tests {
         for name in fixtures {
             let src = decode(&fixture(name));
             for (label, format, floor) in formats {
-                let opts = KrimpOptions { format, quality: 90, progressive: true };
+                let opts = KrimpOptions { format, quality: 90, progressive: true, max_effort: false };
                 let bytes = encode(&src.rgba, src.width, src.height, opts).unwrap();
                 let score = ssimulacra2(&src, &decode(&bytes));
                 let bpp = bytes.len() as f64 * 8.0 / f64::from(src.width * src.height);
