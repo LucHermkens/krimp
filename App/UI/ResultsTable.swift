@@ -55,8 +55,21 @@ struct ResultsTable: View {
                 model.removeSelection()
                 return .handled
             }
+            .onKeyPress(.space) {
+                model.togglePreview()
+                return .handled
+            }
             .onDeleteCommand { model.removeSelection() }
             .onAppear { focused = true }
+            // The table doesn't report clicks, so treat a newly selected row as the last clicked.
+            .onChange(of: model.selection) { old, new in
+                let added = new.subtracting(old)
+                if added.count == 1 {
+                    model.focusedItem = added.first
+                } else if let focused = model.focusedItem, !new.contains(focused) {
+                    model.focusedItem = new.count == 1 ? new.first : nil
+                }
+            }
             .contextMenu(forSelectionType: ImageItem.ID.self) { ids in
                 if !ids.isEmpty {
                     ItemMenu(ids: ids)

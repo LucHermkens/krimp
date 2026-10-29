@@ -13,6 +13,10 @@ final class AppModel {
     var showImporter = false
     /// Shared by the grid and the table.
     var selection = Set<ImageItem.ID>()
+    /// The item last clicked or moved to with the arrow keys; Quick Look shows this one.
+    var focusedItem: ImageItem.ID?
+    /// File shown in the Quick Look panel, if open.
+    var previewURL: URL?
 
     @ObservationIgnored private var runTask: Task<Void, Never>?
 
@@ -40,6 +44,16 @@ final class AppModel {
 
     func removeSelection() {
         remove(selection)
+    }
+
+    /// Space bar: Quick Look the focused item (the output if one was written), or close it.
+    func togglePreview() {
+        if previewURL != nil {
+            previewURL = nil
+            return
+        }
+        let id = focusedItem.flatMap { selection.contains($0) ? $0 : nil } ?? items.last { selection.contains($0.id) }?.id
+        previewURL = id.flatMap(item)?.revealURL
     }
 
     func clear() {
