@@ -1,0 +1,4 @@
+module KrimpCore {
+    header "krimp_core.h"
+    export *
+}

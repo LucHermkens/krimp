@@ -1,0 +1,3 @@
+[submodule "core/vendor/jpegli"]
+	path = core/vendor/jpegli
+	url = https://github.com/google/jpegli.git

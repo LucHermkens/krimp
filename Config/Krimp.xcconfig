@@ -1,0 +1,21 @@
+// Build settings for the Krimp app target.
+
+PRODUCT_NAME = Krimp
+PRODUCT_BUNDLE_IDENTIFIER = io.github.luchermkens.krimp
+
+// Rust core: static library + generated C header (see scripts/build-core.sh).
+SWIFT_INCLUDE_PATHS = $(SRCROOT)/Bridge
+OTHER_LDFLAGS = $(SRCROOT)/core/target/aarch64-apple-darwin/release/libkrimp_core.a -lc++
+
+// Signing: ad-hoc with Hardened Runtime and no App Sandbox. To sign with your own
+// certificate, create the git-ignored Local.xcconfig next to project.yml containing e.g.
+//   DEVELOPMENT_TEAM = ABCDE12345
+//   CODE_SIGN_IDENTITY = Apple Development
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+ENABLE_HARDENED_RUNTIME = YES
+ENABLE_APP_SANDBOX = NO
+CODE_SIGN_INJECT_BASE_ENTITLEMENTS = YES
+
+#include? "../Local.xcconfig"
