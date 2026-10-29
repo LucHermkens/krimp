@@ -6,8 +6,10 @@ license = "GPL-3.0-or-later"
 publish = false
 build = "build.rs"
 
+# The app links a static library built with `cargo rustc --crate-type staticlib` (see
+# scripts/build-core.sh). Listing staticlib here next to rlib would silently disable LTO.
 [lib]
-crate-type = ["staticlib", "rlib"]
+crate-type = ["rlib"]
 
 [features]
 default = ["avif", "svg-min"]

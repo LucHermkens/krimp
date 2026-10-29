@@ -19,11 +19,13 @@ run() {
 
 cd "$ROOT/core"
 
+# Only the staticlib crate type: rustc skips LTO when it also has to emit an rlib.
 # Optional: KRIMP_FEATURES="svg-min" builds without AVIF, etc.
 if [ -n "${KRIMP_FEATURES+x}" ]; then
-    run cargo build --release --target aarch64-apple-darwin --no-default-features --features "$KRIMP_FEATURES"
+    run cargo rustc --release --target aarch64-apple-darwin --lib --crate-type staticlib \
+        --no-default-features --features "$KRIMP_FEATURES"
 else
-    run cargo build --release --target aarch64-apple-darwin
+    run cargo rustc --release --target aarch64-apple-darwin --lib --crate-type staticlib
 fi
 
 # cbindgen only rewrites the header when its content changes.
