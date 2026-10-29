@@ -8,3 +8,4 @@ Local.xcconfig
 core/target/
 Bridge/krimp_core.h
 Tests/Fixtures/downloaded/
+__pycache__/
