@@ -9,7 +9,7 @@ XCODEBUILD = xcodebuild -project Krimp.xcodeproj -scheme Krimp -derivedDataPath 
 export PATH := $(HOME)/.cargo/bin:/opt/homebrew/bin:$(PATH)
 export MACOSX_DEPLOYMENT_TARGET := 26.0
 
-.PHONY: all bootstrap core project app run test test-core test-app fixtures size notices clean
+.PHONY: all bootstrap core project app run test test-core test-app fixtures size notices icon clean
 
 all: app
 
@@ -61,6 +61,13 @@ size: app
 notices:
 	cd core && cargo about generate --fail -o ../build/rust-notices.md about.hbs
 	scripts/make_notices.py build/rust-notices.md
+
+## Redraws App/Resources/AppIcon.icns (needs ImageMagick for the 256-colour quantisation).
+icon:
+	rm -rf build/icon && mkdir -p build/icon
+	swift scripts/make_icon.swift build/icon
+	for f in build/icon/*.png; do magick "$$f" -dither FloydSteinberg -colors 256 PNG8:"$$f"; done
+	scripts/pack_icns.py build/icon App/Resources/AppIcon.icns
 
 clean:
 	rm -rf build core/target Krimp.xcodeproj Bridge/krimp_core.h

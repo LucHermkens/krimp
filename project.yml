@@ -38,6 +38,7 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Krimp
+        CFBundleIconFile: AppIcon
         CFBundleName: Krimp
         LSApplicationCategoryType: public.app-category.graphics-design
         NSHumanReadableCopyright: "Copyright © 2026 Luc Hermkens. Licensed under GPL-3.0-or-later."
