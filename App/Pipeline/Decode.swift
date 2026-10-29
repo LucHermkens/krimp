@@ -38,16 +38,49 @@ enum DecodeError: LocalizedError {
 }
 
 enum Decode {
-    /// Every type ImageIO can decode on this system, plus SVG/SVGZ.
+    /// Types ImageIO decodes but Krimp deliberately doesn't handle (no libraries for them).
+    static let excludedTypes: [UTType] = [
+        .pdf, UTType("com.adobe.illustrator.ai-image"), UTType("com.adobe.encapsulated-postscript"),
+        UTType("com.adobe.postscript"),
+    ].compactMap { $0 }
+
+    /// Every type ImageIO can decode on this system (minus `excludedTypes`), plus SVG/SVGZ.
+    /// Used for the open panel, drag and drop and Dock drops.
     static let readableTypes: [UTType] = {
         let identifiers = (CGImageSourceCopyTypeIdentifiers() as? [String]) ?? []
-        var types = identifiers.compactMap(UTType.init)
+        var types = identifiers.compactMap(UTType.init).filter { type in
+            !excludedTypes.contains { type.conforms(to: $0) }
+        }
         types += [.svg, .svgz]
         return types
     }()
 
     static func isSVG(_ url: URL) -> Bool {
         ["svg", "svgz"].contains(url.pathExtension.lowercased())
+    }
+
+    static func isReadable(_ url: URL) -> Bool {
+        if isSVG(url) { return true }
+        guard let type = (try? url.resourceValues(forKeys: [.contentTypeKey]))?.contentType
+            ?? UTType(filenameExtension: url.pathExtension) else { return false }
+        return readableTypes.contains { type.conforms(to: $0) }
+    }
+
+    /// Extensions from FileFlow's thumbnail service, checked against ImageIO at launch.
+    static let referenceExtensions = """
+        jpg jpeg jpe jfif png gif webp avif heic heif tif tiff bmp ico cur tga psd jp2 jpf jxl exr hdr dds \
+        pbm pgm ppm pnm pam dng cr2 cr3 crw nef nrw arw sr2 srf raf orf rw2 pef 3fr fff iiq mos mrw mef kdc \
+        dcr raw svg svgz
+        """.split(whereSeparator: { $0 == " " || $0 == "\\" || $0.isNewline }).map(String.init)
+
+    /// Logs which reference extensions this system can read.
+    static func logSupport() {
+        let readable = referenceExtensions.filter { isReadable(URL(fileURLWithPath: "/x.\($0)")) }
+        let missing = referenceExtensions.filter { !readable.contains($0) }
+        Pipeline.log.info("""
+            ImageIO reads: \(readable.joined(separator: " "), privacy: .public); \
+            not readable: \(missing.joined(separator: " "), privacy: .public)
+            """)
     }
 
     /// Reads the size and type without decoding pixels.
